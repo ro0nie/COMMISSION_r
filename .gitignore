@@ -1,0 +1,4 @@
+*.o
+*.a
+main-sb*
+main-lb*
