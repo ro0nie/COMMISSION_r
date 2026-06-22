@@ -3,17 +3,25 @@ CUBIOMES_SRC := $(addprefix cubiomes/,biomenoise.c biomes.c finders.c generator.
 LARGE_BIOMES ?= 0
 UNBOUND ?= 0
 PRINT_INTERVAL ?= 4096
-BLACKWELL_GPU := $(shell { nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | grep -Eq '^(10|12)\.' || nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | grep -Eiq 'Blackwell|GeForce RTX 50[0-9]+|GB10|GB20[0-9]|B[23]00'; } && echo 1)
-ifeq ($(origin ARCH), undefined)
-ifeq ($(BLACKWELL_GPU),1)
-ARCH := sm_89
-else
-ARCH := native
+# Auto-detect GPU architecture:
+# - RTX 40xx/50xx series: sm_89 is faster than native sm_120
+# - Everything else: use native
+# Override manually with: make GPU_ARCH=sm_89
+ifndef GPU_ARCH
+  GPU_NAMES := $(shell nvidia-smi --query-gpu=name --format=csv,noheader)
+  ifneq (,$(findstring RTX 40,$(GPU_NAMES)))
+    GPU_ARCH := sm_89
+  else ifneq (,$(findstring RTX 50,$(GPU_NAMES)))
+    GPU_ARCH := sm_89
+  else
+    GPU_ARCH := native
+  endif
 endif
-endif
+
+$(info Using GPU_ARCH = $(GPU_ARCH))
 override CFLAGS += -O3
 override CXXFLAGS += -O3 -std=c++20 -I asio/asio/include -DOMISSION_LARGE_BIOMES=$(LARGE_BIOMES) -DOMISSION_UNBOUND=$(UNBOUND) -DPRINT_INTERVAL=$(PRINT_INTERVAL)
-override NVCC_FLAGS += $(CXXFLAGS) --expt-relaxed-constexpr --default-stream per-thread -arch=$(ARCH)
+override NVCC_FLAGS += $(CXXFLAGS) --expt-relaxed-constexpr --default-stream per-thread -arch=$(GPU_ARCH) -use_fast_math
 
 ifeq ($(OS),Windows_NT)
 all: main.exe
@@ -52,6 +60,9 @@ else
 endif
 
 all: main
+
+clean:
+	rm -f main libcubiomes.a biomenoise.o biomes.o finders.o generator.o layers.o noise.o cubiomes.o gpu.o cpu.o client.o server.o
 
 libcubiomes.a:
 	$(CC) -c $(CUBIOMES_SRC) -fwrapv $(CFLAGS)
