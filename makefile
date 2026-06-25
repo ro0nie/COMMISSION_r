@@ -76,6 +76,15 @@ override NVCC_FLAGS += -ccbin $(CXX)
 MAIN_SRC := src/main.cpp
 MAIN_DEP := $(MAIN_SRC) src/common.h
 
+MAIN_SRC += config.o shroomposter.o
+MAIN_DEP += config.o shroomposter.o src/config.h src/shroomposter.h
+
+ifneq ($(wildcard /usr/include/openssl/err.h),)
+MAIN_SRC += cpp20_http_client.o
+MAIN_DEP += cpp20_http_client.o src/cpp20_http_client.hpp
+MAIN_CXXFLAGS += -lssl -lcrypto
+endif
+
 ifndef NO_GPU
 	MAIN_SRC += gpu.o
 	MAIN_DEP += gpu.o src/gpu.h
@@ -103,7 +112,7 @@ endif
 all: main
 
 clean:
-	rm -f main libcubiomes.a biomenoise.o biomes.o finders.o generator.o layers.o noise.o cubiomes.o gpu.o cpu.o client.o server.o
+	rm -f main libcubiomes.a biomenoise.o biomes.o finders.o generator.o layers.o noise.o cubiomes.o gpu.o cpu.o client.o server.o config.o shroomposter.o cpp20_http_client.o
 
 libcubiomes.a: $(CUBIOMES_SRC)
 	$(CC) -c $(CUBIOMES_SRC) -fwrapv $(CFLAGS)
@@ -122,6 +131,15 @@ client.o: src/client.cpp src/client.h src/common.h
 	$(CXX) -c $< -o $@ $(CXXFLAGS)
 
 server.o: src/server.cpp src/server.h src/common.h
+	$(CXX) -c $< -o $@ $(CXXFLAGS)
+
+config.o: src/config.cpp src/config.h
+	$(CXX) -c $< -o $@ $(CXXFLAGS)
+
+shroomposter.o: src/shroomposter.cpp src/shroomposter.h src/config.h
+	$(CXX) -c $< -o $@ $(CXXFLAGS)
+
+cpp20_http_client.o: src/cpp20_http_client.cpp src/cpp20_http_client.hpp
 	$(CXX) -c $< -o $@ $(CXXFLAGS)
 
 main: $(MAIN_DEP)

@@ -1,7 +1,12 @@
 #include "shroomposter.h"
 #include "config.h"
 
+#if defined(_WIN32) || __has_include(<openssl/err.h>)
 #include "cpp20_http_client.hpp"
+#define SHROOMPOSTER_HTTP_AVAILABLE 1
+#else
+#define SHROOMPOSTER_HTTP_AVAILABLE 0
+#endif
 
 #include <queue>
 #include <mutex>
@@ -20,6 +25,7 @@ static std::queue<PostResult> g_queue;
 
 static std::thread g_thread;
 static std::atomic<bool> g_running{false};
+static std::atomic<bool> g_http_unavailable_logged{false};
 
 static void shroomposter_worker()
 {
@@ -59,6 +65,7 @@ static void shroomposter_worker()
             "https://shroomweb.0xa.pw/small_biomes";
 #endif
 
+#if SHROOMPOSTER_HTTP_AVAILABLE
         try
         {
             auto response =
@@ -104,6 +111,11 @@ static void shroomposter_worker()
                 e.what()
             );
         }
+#else
+        if (!g_http_unavailable_logged.exchange(true)) {
+            std::fprintf(stderr, "HTTP posting disabled: OpenSSL headers not found at build time\n");
+        }
+#endif
     }
 }
 
